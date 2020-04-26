@@ -49,7 +49,7 @@ class DocstringParam(DocstringMeta):
     def __init__(
         self,
         args: T.List[str],
-        description: str,
+        description: T.Optional[str],
         arg_name: str,
         type_name: T.Optional[str],
         is_optional: T.Optional[bool],
@@ -69,21 +69,26 @@ class DocstringReturns(DocstringMeta):
     def __init__(
         self,
         args: T.List[str],
-        description: str,
+        description: T.Optional[str],
         type_name: T.Optional[str],
         is_generator: bool,
+        return_name: T.Optional[str] = None
     ) -> None:
         """Initialize self."""
         super().__init__(args, description)
         self.type_name = type_name
         self.is_generator = is_generator
+        self.return_name = return_name
 
 
 class DocstringRaises(DocstringMeta):
     """DocstringMeta symbolizing :raises metadata."""
 
     def __init__(
-        self, args: T.List[str], description: str, type_name: T.Optional[str]
+        self,
+        args: T.List[str],
+        description: T.Optional[str],
+        type_name: T.Optional[str]
     ) -> None:
         """Initialize self."""
         super().__init__(args, description)
