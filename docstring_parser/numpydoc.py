@@ -1,8 +1,6 @@
 """Numpydoc-style docstring parsing.
 
-See Also
---------
-https://numpydoc.readthedocs.io/en/latest/format.html
+.. seealso:: https://numpydoc.readthedocs.io/en/latest/format.html
 """
 
 import inspect
@@ -50,18 +48,45 @@ RETURN_KEY_REGEX = re.compile(r'^(?:(?P<name>.*?)\s*:\s*)?(?P<type>.*?)$')
 
 @dataclass
 class Section:
+    """Numpydoc section parser.
+
+    :param title: section title. For most sections, this is a heading like
+                  "Parameters" which appears on its own line, underlined by
+                  en-dashes ('-') on the following line.
+    :param key: meta key string. In the parsed ``DocstringMeta`` instance this
+                will be the first element of the ``args`` attribute list.
+    """
     title: str
     key: str
 
     @property
     def title_pattern(self) -> str:
+        """Regular expression pattern matching this section's header.
+
+        This pattern will match this instance's ``title`` attribute in
+        an anonymous group.
+        """
         return r"^({})\s*?\n{}\s*$".format(self.title, '-' * len(self.title))
 
     def parse(self, text: str) -> T.Iterable[DocstringMeta]:
+        """Parse ``DocstringMeta`` objects from the body of this section.
+
+        :param text: section body text. Should be cleaned with
+                     ``inspect.cleandoc`` before parsing.
+        """
         yield DocstringMeta([self.key], description=_clean_str(text))
 
 
 class _KVSection(Section):
+    """Base parser for numpydoc sections with key-value syntax.
+
+    E.g. sections that look like this:
+        key
+            value
+        key2 : type
+            values can also span...
+            ... multiple lines
+    """
     def _parse_item(self, key: str, value: str) -> DocstringMeta:
         pass
 
@@ -74,13 +99,28 @@ class _KVSection(Section):
                                    value=inspect.cleandoc(value))
 
 
-class SphinxSection(Section):
+class _SphinxSection(Section):
+    """Base parser for numpydoc sections with sphinx-style syntax.
+
+    E.g. sections that look like this:
+        .. title:: something
+            possibly over multiple lines
+    """
     @property
     def title_pattern(self) -> str:
         return r"^\.\.\s*({})\s*::".format(self.title)
 
 
 class ParamSection(_KVSection):
+    """Parser for numpydoc parameter sections.
+
+    E.g. any section that looks like this:
+        arg_name
+            arg_description
+        arg_2 : type, optional
+            descriptions can also span...
+            ... multiple lines
+    """
     def _parse_item(self, key: str, value: str) -> DocstringParam:
         m = PARAM_KEY_REGEX.match(key)
         arg_name = type_name = is_optional = None
@@ -111,6 +151,12 @@ class ParamSection(_KVSection):
 
 
 class RaisesSection(_KVSection):
+    """Parser for numpydoc raises sections.
+
+    E.g. any section that looks like this:
+        ValueError
+            A description of what might raise ValueError
+    """
     def _parse_item(self, key: str, value: str) -> DocstringRaises:
         return DocstringRaises(
             args=[self.key, key],
@@ -120,6 +166,14 @@ class RaisesSection(_KVSection):
 
 
 class ReturnsSection(_KVSection):
+    """Parser for numpydoc raises sections.
+
+    E.g. any section that looks like this:
+        return_name : type
+            A description of this returned value
+        another_type
+            Return names are optional, types are required
+    """
     is_generator = False
 
     def _parse_item(self, key: str, value: str) -> DocstringReturns:
@@ -139,10 +193,12 @@ class ReturnsSection(_KVSection):
 
 
 class YieldsSection(ReturnsSection):
+    """Parser for numpydoc generator "yields" sections."""
     is_generator = True
 
 
-class DeprecationSection(SphinxSection):
+class DeprecationSection(_SphinxSection):
+    """Parser for numpydoc "deprecation warning" sections."""
     def parse(self, text: str) -> T.Iterable[DocstringDeprecated]:
         version, desc, *_ = text.split(sep='\n', maxsplit=1) + [None, None]
 
@@ -156,7 +212,7 @@ class DeprecationSection(SphinxSection):
         )
 
 
-DEFAULT_SECTIONS = {s.title: s for s in [
+DEFAULT_SECTIONS = [
     ParamSection("Parameters", "param"),
     ParamSection("Params", "param"),
     ParamSection("Arguments", "param"),
@@ -188,7 +244,7 @@ DEFAULT_SECTIONS = {s.title: s for s in [
     Section("References", "references"),
     Section("Reference", "references"),
     DeprecationSection("deprecated", "deprecation"),
-]}
+]
 
 
 class NumpydocParser:
@@ -200,7 +256,7 @@ class NumpydocParser:
         :param sections: Recognized sections or None to defaults.
         """
         sections = sections or DEFAULT_SECTIONS
-        self.sections = sections.copy()
+        self.sections = {s.title: s for s in sections}
         self._setup()
 
     def _setup(self):
