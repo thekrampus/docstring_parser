@@ -191,7 +191,7 @@ DEFAULT_SECTIONS = {s.title: s for s in [
 ]}
 
 
-class NumpyParser:
+class NumpydocParser:
     def __init__(
         self, sections: T.Optional[T.Dict[str, Section]] = None
     ):
@@ -268,4 +268,4 @@ def parse(text: str) -> Docstring:
 
     :returns: parsed docstring
     """
-    return NumpyParser().parse(text)
+    return NumpydocParser().parse(text)
