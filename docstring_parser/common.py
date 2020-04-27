@@ -96,6 +96,21 @@ class DocstringRaises(DocstringMeta):
         self.description = description
 
 
+class DocstringDeprecated(DocstringMeta):
+    """DocstringMeta symbolizing deprecation metadata."""
+
+    def __init__(
+        self,
+        args: T.List[str],
+        description: T.Optional[str],
+        version: T.Optional[str]
+    ) -> None:
+        """Initialize self."""
+        super().__init__(args, description)
+        self.version = version
+        self.description = description
+
+
 class Docstring:
     """Docstring object representation."""
 
@@ -121,5 +136,12 @@ class Docstring:
     def returns(self) -> T.Optional[DocstringReturns]:
         for item in self.meta:
             if isinstance(item, DocstringReturns):
+                return item
+        return None
+
+    @property
+    def deprecation(self) -> T.Optional[DocstringDeprecated]:
+        for item in self.meta:
+            if isinstance(item, DocstringDeprecated):
                 return item
         return None
