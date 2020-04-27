@@ -619,16 +619,39 @@ def test_examples() -> None:
     assert docstring.meta[0].description == "long example\n\nmore here"
 
 
-def test_deprecation() -> None:
-    docstring = parse(
-        """
-        Short description
+@pytest.mark.parametrize(
+    "source, expected_depr_version, expected_depr_desc",
+    [
+        (
+            "Short description\n\n.. deprecated:: 1.6.0\n    This is busted!",
+            "1.6.0",
+            "This is busted!"
+        ),
+        (
+            ("Short description\n\n"
+             ".. deprecated:: 1.6.0\n"
+             "    This description has\n"
+             "    multiple lines!"),
+            "1.6.0",
+            "This description has\nmultiple lines!"
+        ),
+        (
+            "Short description\n\n.. deprecated:: 1.6.0",
+            "1.6.0",
+            None
+        ),
+        (
+            "Short description\n\n.. deprecated::\n    No version!",
+            None,
+            "No version!"
+        )
+    ]
+)
+def test_deprecation(source: str,
+                     expected_depr_version: T.Optional[str],
+                     expected_depr_desc: T.Optional[str]) -> None:
+    docstring = parse(source)
 
-        .. deprecated:: 1.6.0
-            This is busted!
-        """
-    )
-
-    assert len(docstring.meta) == 1
-    assert docstring.meta[0].version == '1.6.0'
-    assert docstring.meta[0].description == "This is busted!"
+    assert docstring.deprecation is not None
+    assert docstring.deprecation.version == expected_depr_version
+    assert docstring.deprecation.description == expected_depr_desc
