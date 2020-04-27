@@ -1,4 +1,4 @@
-"""Numpy-style docstring parsing.
+"""Numpydoc-style docstring parsing.
 
 See Also
 --------
@@ -17,6 +17,7 @@ from .common import (
     DocstringParam,
     DocstringRaises,
     DocstringReturns,
+    DocstringDeprecated,
 )
 
 
@@ -38,8 +39,11 @@ PARAM_KEY_REGEX = re.compile(r'^(?P<name>.*?)(?:\s*:\s*(?P<type>.*?))?$')
 
 PARAM_OPTIONAL_REGEX = re.compile(r'(?P<type>.*?)(?:, optional|\(optional\))$')
 
-# numpydoc format has no formal grammar for this, but we can make some educated guesses...
-PARAM_DEFAULT_REGEX = re.compile(r'[Dd]efault(?: is | = |: |s to |)\s*(?P<value>[\w\-\.]+)')
+# numpydoc format has no formal grammar for this,
+# but we can make some educated guesses...
+PARAM_DEFAULT_REGEX = re.compile(
+    r'[Dd]efault(?: is | = |: |s to |)\s*(?P<value>[\w\-\.]+)'
+)
 
 RETURN_KEY_REGEX = re.compile(r'^(?:(?P<name>.*?)\s*:\s*)?(?P<type>.*?)$')
 
@@ -48,6 +52,10 @@ RETURN_KEY_REGEX = re.compile(r'^(?:(?P<name>.*?)\s*:\s*)?(?P<type>.*?)$')
 class Section:
     title: str
     key: str
+
+    @property
+    def title_pattern(self) -> str:
+        return r"^({})\s*?\n{}\s*$".format(self.title, '-' * len(self.title))
 
     def parse(self, text: str) -> T.Iterable[DocstringMeta]:
         yield DocstringMeta([self.key], description=_clean_str(text))
@@ -59,8 +67,17 @@ class _KVSection(Section):
 
     def parse(self, text: str) -> T.Iterable[DocstringMeta]:
         for match, next_match in _pairwise(KV_REGEX.finditer(text)):
-            value = text[match.end():next_match.start() if next_match is not None else None]
-            yield self._parse_item(key=match.group(), value=inspect.cleandoc(value))
+            start = match.end()
+            end = next_match.start() if next_match is not None else None
+            value = text[start:end]
+            yield self._parse_item(key=match.group(),
+                                   value=inspect.cleandoc(value))
+
+
+class SphinxSection(Section):
+    @property
+    def title_pattern(self) -> str:
+        return r"^\.\.\s*({})\s*::".format(self.title)
 
 
 class ParamSection(_KVSection):
@@ -125,37 +142,53 @@ class YieldsSection(ReturnsSection):
     is_generator = True
 
 
-# Canon section titles
+class DeprecationSection(SphinxSection):
+    def parse(self, text: str) -> T.Iterable[DocstringDeprecated]:
+        version, desc, *_ = text.split(sep='\n', maxsplit=1) + [None, None]
+
+        if desc is not None:
+            desc = _clean_str(inspect.cleandoc(desc))
+
+        yield DocstringDeprecated(
+            args=[self.key],
+            description=desc,
+            version=_clean_str(version),
+        )
+
+
 DEFAULT_SECTIONS = {s.title: s for s in [
     ParamSection("Parameters", "param"),
+    ParamSection("Params", "param"),
+    ParamSection("Arguments", "param"),
+    ParamSection("Args", "param"),
     ParamSection("Other Parameters", "other_param"),
+    ParamSection("Other Params", "other_param"),
+    ParamSection("Other Arguments", "other_param"),
+    ParamSection("Other Args", "other_param"),
     ParamSection("Receives", "receives"),
+    ParamSection("Receive", "receives"),
     RaisesSection("Raises", "raises"),
+    RaisesSection("Raise", "raises"),
     RaisesSection("Warns", "warns"),
+    RaisesSection("Warn", "warns"),
     ParamSection("Attributes", "attribute"),
+    ParamSection("Attribute", "attribute"),
     ReturnsSection("Returns", "returns"),
+    ReturnsSection("Return", "returns"),
     YieldsSection("Yields", "yields"),
+    YieldsSection("Yield", "yields"),
     Section("Examples", "examples"),
+    Section("Example", "examples"),
     Section("Warnings", "warnings"),
+    Section("Warning", "warnings"),
     Section("See Also", "see_also"),
+    Section("Related", "see_also"),
     Section("Notes", "notes"),
+    Section("Note", "notes"),
     Section("References", "references"),
+    Section("Reference", "references"),
+    DeprecationSection("deprecated", "deprecation"),
 ]}
-
-# A few reasonable section aliases
-DEFAULT_SECTIONS.update({k: DEFAULT_SECTIONS[v] for k, v in {
-    'Params': 'Parameters',
-    'Arguments': 'Parameters',
-    'Args': 'Parameters',
-    'Other Params': 'Other Parameters',
-    'Other Arguments': 'Other Parameters',
-    'Other Args': 'Other Parameters',
-    'Return': 'Returns',
-    'Yield': 'Yields',
-    'Example': 'Examples',
-    'Warning': 'Warnings',
-    }.items()
-})
 
 
 class NumpyParser:
@@ -172,9 +205,7 @@ class NumpyParser:
 
     def _setup(self):
         self.titles_re = re.compile(
-            r"("
-            + r"|".join(f"^{s}\s*\n{'-' * len(s)}\s*$" for s in self.sections)
-            + ")",
+            r"|".join(s.title_pattern for s in self.sections.values()),
             flags=re.M
         )
 
@@ -219,13 +250,14 @@ class NumpyParser:
             ret.blank_after_long_description = long_desc_chunk.endswith("\n\n")
             ret.long_description = long_desc_chunk.strip() or None
 
-        for match, next_match in _pairwise(self.titles_re.finditer(meta_chunk)):
-            title = match.group(1).split('\n')[0]
+        for match, nextmatch in _pairwise(self.titles_re.finditer(meta_chunk)):
+            title = next(g for g in match.groups() if g is not None)
             factory = self.sections[title]
 
-            # section chunk starts after the header, ends at the start of the next header
+            # section chunk starts after the header,
+            # ends at the start of the next header
             start = match.end()
-            end = next_match.start() if next_match is not None else None
+            end = nextmatch.start() if nextmatch is not None else None
             ret.meta.extend(factory.parse(meta_chunk[start:end]))
 
         return ret
