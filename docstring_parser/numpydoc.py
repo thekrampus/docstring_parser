@@ -127,7 +127,8 @@ class ParamSection(_KVSection):
 
     def _parse_item(self, key: str, value: str) -> DocstringParam:
         m = PARAM_KEY_REGEX.match(key)
-        arg_name = type_name = is_optional = None
+        arg_name = type_name = None
+        is_optional = False
         if m is not None:
             arg_name, type_name = m.group("name"), m.group("type")
             if type_name is not None:

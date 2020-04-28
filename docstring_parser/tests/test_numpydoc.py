@@ -251,7 +251,7 @@ def test_default_args():
 
     arg4 = docstring.params[3]
     assert arg4.arg_name == "arg4"
-    assert arg4.is_optional
+    assert arg4.is_optional is True
     assert arg4.type_name == "Optional[Dict[str, Any]]"
     assert arg4.default == "None"
     assert arg4.description == "The fourth arg. Defaults to None"
@@ -309,25 +309,30 @@ def test_params() -> None:
             description 3
         ratio : Optional[float], optional
             description 4
+        arg_without_description
         """
     )
-    assert len(docstring.params) == 4
+    assert len(docstring.params) == 5
     assert docstring.params[0].arg_name == "name"
     assert docstring.params[0].type_name is None
     assert docstring.params[0].description == "description 1"
-    assert not docstring.params[0].is_optional
+    assert docstring.params[0].is_optional is False
     assert docstring.params[1].arg_name == "priority"
     assert docstring.params[1].type_name == "int"
     assert docstring.params[1].description == "description 2"
-    assert not docstring.params[1].is_optional
+    assert docstring.params[1].is_optional is False
     assert docstring.params[2].arg_name == "sender"
     assert docstring.params[2].type_name == "str"
     assert docstring.params[2].description == "description 3"
-    assert docstring.params[2].is_optional
+    assert docstring.params[2].is_optional is True
     assert docstring.params[3].arg_name == "ratio"
     assert docstring.params[3].type_name == "Optional[float]"
     assert docstring.params[3].description == "description 4"
-    assert docstring.params[3].is_optional
+    assert docstring.params[3].is_optional is True
+    assert docstring.params[4].arg_name == "arg_without_description"
+    assert docstring.params[4].type_name is None
+    assert docstring.params[4].description is None
+    assert docstring.params[4].is_optional is False
 
     docstring = parse(
         """
@@ -377,19 +382,19 @@ def test_attributes() -> None:
     assert docstring.params[0].arg_name == "name"
     assert docstring.params[0].type_name is None
     assert docstring.params[0].description == "description 1"
-    assert not docstring.params[0].is_optional
+    assert docstring.params[0].is_optional is False
     assert docstring.params[1].arg_name == "priority"
     assert docstring.params[1].type_name == "int"
     assert docstring.params[1].description == "description 2"
-    assert not docstring.params[1].is_optional
+    assert docstring.params[1].is_optional is False
     assert docstring.params[2].arg_name == "sender"
     assert docstring.params[2].type_name == "str"
     assert docstring.params[2].description == "description 3"
-    assert docstring.params[2].is_optional
+    assert docstring.params[2].is_optional is True
     assert docstring.params[3].arg_name == "ratio"
     assert docstring.params[3].type_name == "Optional[float]"
     assert docstring.params[3].description == "description 4"
-    assert docstring.params[3].is_optional
+    assert docstring.params[3].is_optional is True
 
     docstring = parse(
         """
@@ -434,7 +439,7 @@ def test_other_params() -> None:
     ]
     assert docstring.meta[0].arg_name == "only_seldom_used_keywords"
     assert docstring.meta[0].type_name == "type"
-    assert docstring.meta[0].is_optional
+    assert docstring.meta[0].is_optional is True
     assert docstring.meta[0].description == "Explanation"
 
     assert docstring.meta[1].args == [
